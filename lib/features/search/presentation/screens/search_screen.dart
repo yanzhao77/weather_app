@@ -58,11 +58,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       }
       return;
     }
+    // 反查结果只取名称，坐标始终用定位坐标
     LocationData named = loc;
     try {
-      named = await ref
+      final geo = await ref
           .read(weatherRepositoryProvider)
           .reverseGeocode(loc.latitude, loc.longitude);
+      named = LocationData(
+        name: geo.name,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        country: geo.country,
+        adminArea: geo.adminArea,
+        localName: geo.localName,
+      );
     } catch (_) {}
     final index = ref.read(locationsProvider.notifier).add(named);
     ref

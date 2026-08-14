@@ -48,6 +48,22 @@ class LocationsNotifier extends StateNotifier<LocationsState> {
     return newIndex;
   }
 
+  /// 仅更新指定地区的名称信息（保留坐标），不改变当前索引
+  void updateName(int index, LocationData location) {
+    if (index < 0 || index >= state.locations.length) return;
+    final current = state.locations[index];
+    final updated = [...state.locations];
+    updated[index] = LocationData(
+      name: location.name,
+      latitude: current.latitude,
+      longitude: current.longitude,
+      country: location.country,
+      adminArea: location.adminArea,
+      localName: location.localName,
+    );
+    _persist(updated);
+  }
+
   /// 移除指定索引的地区
   void removeAt(int index) {
     if (state.locations.isEmpty || index < 0 || index >= state.locations.length) {

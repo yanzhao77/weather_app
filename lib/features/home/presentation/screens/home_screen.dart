@@ -51,10 +51,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  /// 首次进入：已有地区直接加载；空列表则尝试定位添加第一个地区
+  /// 首次进入：已有地区直接加载（空名称补全）；空列表则尝试定位添加第一个地区
   Future<void> _ensureInitialLocation() async {
     final locations = ref.read(locationsProvider).locations;
     if (locations.isNotEmpty) {
+      // 历史数据可能因之前反查失败而缺少名称，启动时逐个补全（不改坐标/索引）
+      for (final loc in locations) {
+        if (loc.name.isEmpty) {
+          await _enrichLocationName(loc);
+        }
+      }
       await _loadWeatherForIndex(ref.read(locationsProvider).currentIndex);
       return;
     }
@@ -65,11 +71,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final loc = ref.read(locationProvider).location;
     if (loc == null || !mounted) return; // 定位失败则停留在空状态页
 
+    // 反查结果只取名称，坐标始终用定位坐标（reverse 可能返回不同坐标的行政区）
     LocationData named = loc;
     try {
-      named = await ref
+      final geo = await ref
           .read(weatherRepositoryProvider)
           .reverseGeocode(loc.latitude, loc.longitude);
+      named = LocationData(
+        name: geo.name,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        country: geo.country,
+        adminArea: geo.adminArea,
+        localName: geo.localName,
+      );
     } catch (_) {}
 
     final index = ref.read(locationsProvider.notifier).add(named);
@@ -82,6 +97,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(locationsProvider.notifier).setCurrentIndex(index);
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
+    }
+  }
+
+  /// 反查坐标对应的城市名称并就地更新（只取名称，坐标保持原值，不改变索引）
+  Future<void> _enrichLocationName(LocationData loc) async {
+    try {
+      final named = await ref
+          .read(weatherRepositoryProvider)
+          .reverseGeocode(loc.latitude, loc.longitude);
+      if (named.name.isNotEmpty) {
+        final notifier = ref.read(locationsProvider.notifier);
+        final locations = ref.read(locationsProvider).locations;
+        final idx = locations.indexWhere(
+          (l) =>
+              (l.latitude - loc.latitude).abs() < 0.001 &&
+              (l.longitude - loc.longitude).abs() < 0.001,
+        );
+        if (idx >= 0) {
+          notifier.updateName(idx, named);
+        }
+      }
+    } catch (_) {
+      // 反查失败保持现状，下次启动会再尝试
     }
   }
 
@@ -279,8 +317,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final data = weatherState.data;
     if (data == null) return _buildInitialState(loc);
 
-    final cityName = loc.name.isNotEmpty
-        ? loc.name
+    final displayName = loc.localName ?? loc.name;
+    final cityName = displayName.isNotEmpty
+        ? displayName
         : '${loc.latitude.toStringAsFixed(2)}, ${loc.longitude.toStringAsFixed(2)}';
 
     return SingleChildScrollView(
@@ -314,7 +353,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final canDelete = ref.watch(locationsProvider).locations.length > 1;
     final statusText = weatherState.isLoading
         ? '正在同步天气数据...'
-        : (loc.name.isNotEmpty ? loc.name : '未知位置');
+        : ((loc.localName ?? loc.name).isNotEmpty
+            ? (loc.localName ?? loc.name)
+            : '未知位置');
     return Row(
       children: [
         Container(width: 6, height: 6,
@@ -467,9 +508,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     LocationData named = loc;
     try {
-      named = await ref
+      final geo = await ref
           .read(weatherRepositoryProvider)
           .reverseGeocode(loc.latitude, loc.longitude);
+      named = LocationData(
+        name: geo.name,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        country: geo.country,
+        adminArea: geo.adminArea,
+        localName: geo.localName,
+      );
     } catch (_) {}
     final index = ref.read(locationsProvider.notifier).add(named);
     _jumpToPage(index);
