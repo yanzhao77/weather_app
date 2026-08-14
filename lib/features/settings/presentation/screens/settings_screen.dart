@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'v1.0.0',
+                  'v1.1.0',
                   style: TextStyle(
                     fontFamily: 'JetBrainsMono',
                     fontSize: 11,
