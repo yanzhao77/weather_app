@@ -9,22 +9,26 @@ class SearchState {
   final List<LocationData> results;
   final bool isLoading;
   final String? error;
+  final bool hasSearched;
 
   const SearchState({
     this.results = const [],
     this.isLoading = false,
     this.error,
+    this.hasSearched = false,
   });
 
   SearchState copyWith({
     List<LocationData>? results,
     bool? isLoading,
     String? error,
+    bool? hasSearched,
   }) {
     return SearchState(
       results: results ?? this.results,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      hasSearched: hasSearched ?? this.hasSearched,
     );
   }
 }
@@ -51,11 +55,11 @@ class SearchNotifier extends StateNotifier<SearchState> {
     try {
       final results = await _repository.searchCity(query, cancelToken: token);
       if (token.isCancelled) return;
-      state = SearchState(results: results, isLoading: false);
+      state = SearchState(results: results, isLoading: false, hasSearched: true);
     } catch (e) {
       if (token.isCancelled) return;
       final message = e is AppException ? e.message : '未知错误';
-      state = SearchState(error: '搜索失败：$message', isLoading: false);
+      state = SearchState(error: '搜索失败：$message', isLoading: false, hasSearched: true);
     }
   }
 

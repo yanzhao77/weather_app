@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/search_provider.dart';
 import '../../../home/domain/location_data.dart';
@@ -131,9 +132,53 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentCyan, strokeWidth: 1.5));
     }
 
+    // 搜索失败：展示错误与引导（如未配置 API Key）
+    if (searchState.error != null) {
+      final isApiKeyIssue = searchState.error!.contains('API Key');
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off, size: 44, color: AppColors.warning),
+              const SizedBox(height: 14),
+              Text(
+                searchState.error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, height: 1.5, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              if (isApiKeyIssue)
+                FilledButton.icon(
+                  onPressed: () => context.push('/settings'),
+                  icon: const Icon(Icons.key, size: 15),
+                  label: const Text('去设置 API Key'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accentCyan.withValues(alpha: 0.15),
+                    foregroundColor: AppColors.accentCyan,
+                    side: const BorderSide(color: AppColors.accentCyan, width: 0.5),
+                  ),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () => ref.read(searchProvider.notifier).search(_controller.text),
+                  icon: const Icon(Icons.refresh, size: 15),
+                  label: const Text('重试'),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accentCyan),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (searchState.results.isEmpty) {
-      return const Center(
-        child: Text('输入城市名开始搜索', style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textDim)),
+      return Center(
+        child: Text(
+          searchState.hasSearched ? '未找到相关城市' : '输入城市名开始搜索',
+          style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textDim),
+        ),
       );
     }
 
