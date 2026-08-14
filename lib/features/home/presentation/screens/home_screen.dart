@@ -376,6 +376,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onPressed: _addLocation,
           icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.accentCyan),
         ),
+        IconButton(
+          tooltip: '设置',
+          constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          padding: EdgeInsets.zero,
+          onPressed: () => context.push('/settings'),
+          icon: const Icon(Icons.settings_outlined, size: 15, color: AppColors.textSecondary),
+        ),
         if (canDelete)
           IconButton(
             tooltip: '删除当前地区',
@@ -442,6 +449,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// 无任何地区时的引导页
   Widget _buildEmptyState() {
+    final hasKey = ref.watch(apiKeyProvider)?.isNotEmpty ?? false;
     return RefreshIndicator(
       onRefresh: _onRefresh,
       color: AppColors.accentCyan,
@@ -483,6 +491,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
             ),
           ),
+          if (!hasKey) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => context.push('/settings'),
+                icon: const Icon(Icons.key, size: 16),
+                label: const Text('配置 API Key'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.accentCyan),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -526,8 +545,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildErrorState(String error) {
+    final isApiKeyIssue = error.contains('API Key');
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -538,7 +558,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 8),
             Text(error, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textDim)),
             const SizedBox(height: 24),
-            TextButton.icon(onPressed: _onRefresh, icon: const Icon(Icons.refresh, size: 16), label: const Text('重试'), style: TextButton.styleFrom(foregroundColor: AppColors.accentCyan)),
+            if (isApiKeyIssue) ...[
+              FilledButton.icon(
+                onPressed: () => context.push('/settings'),
+                icon: const Icon(Icons.key, size: 16),
+                label: const Text('去设置 API Key'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accentCyan.withValues(alpha: 0.15),
+                  foregroundColor: AppColors.accentCyan,
+                  side: const BorderSide(color: AppColors.accentCyan, width: 0.5),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            TextButton.icon(
+              onPressed: _onRefresh,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重试'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.accentCyan),
+            ),
+            TextButton.icon(
+              onPressed: _addLocation,
+              icon: const Icon(Icons.add_location_alt_outlined, size: 16),
+              label: const Text('添加城市'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            ),
           ],
         ),
       ),
