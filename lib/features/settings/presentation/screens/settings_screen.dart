@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/notifications/notification_service.dart';
+import '../../../../shared/widgets/api_key_text_field.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../providers/settings_provider.dart';
 
@@ -145,34 +145,13 @@ class SettingsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '密钥仅用于请求天气数据，输入后以掩码显示，不可复制。',
+              '密钥仅用于请求天气数据，掩码显示，不可复制、不可粘贴。',
               style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, height: 1.5, color: AppColors.textDim),
             ),
             const SizedBox(height: 12),
-            TextField(
+            ApiKeyTextField(
               controller: controller,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              enableInteractiveSelection: false,
-              contextMenuBuilder: (context, editableTextState) =>
-                  const SizedBox.shrink(),
-              inputFormatters: [
-                FilteringTextInputFormatter.deny(RegExp(r'\s')),
-              ],
-              style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13, color: AppColors.textPrimary, letterSpacing: 2),
-              decoration: InputDecoration(
-                hintText: '输入 API Key',
-                hintStyle: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, color: AppColors.textDim),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.borderGlow, width: 0.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.accentCyan, width: 0.8),
-                ),
-              ),
+              hintText: '输入 API Key',
             ),
           ],
         ),

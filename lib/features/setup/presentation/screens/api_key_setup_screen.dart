@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/widgets/api_key_text_field.dart';
 import '../../../../shared/widgets/particle_background.dart';
 import '../../../../shared/widgets/scanline_overlay.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
@@ -96,48 +96,15 @@ class _ApiKeySetupScreenState extends ConsumerState<ApiKeySetupScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppColors.borderGlow, width: 0.5),
                       ),
-                      child: TextField(
-                        controller: _controller,
-                        obscureText: true,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        enableInteractiveSelection: false,
-                        contextMenuBuilder: (context, editableTextState) =>
-                            const SizedBox.shrink(),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                        ],
-                        style: const TextStyle(
-                          fontFamily: 'JetBrainsMono',
-                          fontSize: 14,
-                          color: AppColors.textPrimary,
-                          letterSpacing: 2,
-                        ),
-                        decoration: const InputDecoration(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: ApiKeyTextField(
+                          controller: _controller,
                           hintText: '输入 OpenWeatherMap API Key',
-                          hintStyle: TextStyle(
-                            fontFamily: 'JetBrainsMono',
-                            fontSize: 12,
-                            color: AppColors.textDim,
-                            letterSpacing: 1,
-                          ),
-                          prefixIcon: Icon(Icons.lock_outline, size: 16, color: AppColors.accentCyan),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          errorText: _error,
                         ),
                       ),
                     ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          fontFamily: 'JetBrainsMono',
-                          fontSize: 10,
-                          color: AppColors.accentPink,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
