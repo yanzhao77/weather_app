@@ -5,10 +5,10 @@ class AppConstants {
   static const String defaultApiKey = '';
   static const String baseUrl = 'https://api.openweathermap.org/data/2.5';
   static const String geoUrl = 'https://api.openweathermap.org/geo/1.0';
+  static const Duration apiTimeout = Duration(seconds: 15);
 
   // Cache
   static const Duration cacheDuration = Duration(minutes: 30);
-  static const Duration forecastCacheDuration = Duration(hours: 1);
   static const String hiveBoxWeather = 'weather_cache';
   static const String hiveBoxSettings = 'user_settings';
 

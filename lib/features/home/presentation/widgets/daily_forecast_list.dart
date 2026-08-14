@@ -1,50 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/weather_utils.dart';
 import '../../domain/weather_data.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
+import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/weather_icon.dart';
 
-class DailyForecastList extends StatelessWidget {
+class DailyForecastList extends ConsumerWidget {
   final List<DailyWeather> dailyData;
 
   const DailyForecastList({super.key, required this.dailyData});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final days = dailyData.take(7).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('7天预报', Icons.calendar_month),
+        SectionHeader(title: '${days.length}天预报', icon: Icons.calendar_month),
         const SizedBox(height: 8),
-        ...dailyData.take(7).toList().asMap().entries.map(
-              (entry) => _DailyRow(day: entry.value, index: entry.key),
+        ...days.asMap().entries.map(
+              (entry) => _DailyRow(
+                day: entry.value,
+                index: entry.key,
+                useCelsius: settings.useCelsius,
+              ),
             ),
       ],
     );
   }
 
-  Widget _sectionHeader(String title, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 12, color: AppColors.accentCyan),
-          const SizedBox(width: 6),
-          Text(
-            title.toUpperCase(),
-            style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.accentCyan, letterSpacing: 1.5),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _DailyRow extends StatelessWidget {
   final DailyWeather day;
   final int index;
+  final bool useCelsius;
 
-  const _DailyRow({required this.day, required this.index});
+  const _DailyRow({
+    required this.day,
+    required this.index,
+    required this.useCelsius,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +73,7 @@ class _DailyRow extends StatelessWidget {
           SizedBox(
             width: 30,
             child: Text(
-              WeatherUtils.formatTemperature(day.tempMin),
+              WeatherUtils.formatTemperature(day.tempMin, useCelsius: useCelsius),
               style: const TextStyle(fontFamily: 'Orbitron', fontSize: 11, color: AppColors.textSecondary),
             ),
           ),
@@ -122,7 +121,7 @@ class _DailyRow extends StatelessWidget {
           SizedBox(
             width: 30,
             child: Text(
-              WeatherUtils.formatTemperature(day.tempMax),
+              WeatherUtils.formatTemperature(day.tempMax, useCelsius: useCelsius),
               textAlign: TextAlign.right,
               style: const TextStyle(fontFamily: 'Orbitron', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),

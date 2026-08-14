@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -14,6 +16,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _controller;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -23,12 +26,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    ref.read(searchProvider.notifier).cancelActiveSearch();
     _controller.dispose();
     super.dispose();
   }
 
   void _onSearch(String query) {
-    ref.read(searchProvider.notifier).search(query);
+    // 300ms 防抖：停止输入后才发起请求
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      ref.read(searchProvider.notifier).search(query);
+    });
   }
 
   @override

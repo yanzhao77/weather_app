@@ -1,17 +1,14 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../domain/weather_data.dart';
-import '../../../settings/domain/settings_data.dart';
 
 class WeatherLocalDataSource {
-  static const String _weatherBox = 'weather_cache';
-  static const String _settingsBox = 'user_settings';
+  static const String _weatherBox = AppConstants.hiveBoxWeather;
   static const String _weatherKey = 'current_weather';
   static const String _lastUpdateKey = 'last_update';
-  static const String _settingsKey = 'settings';
 
   Future<void> init() async {
     await Hive.openBox(_weatherBox);
-    await Hive.openBox(_settingsBox);
   }
 
   Future<void> cacheWeatherData(WeatherData data) async {
@@ -44,20 +41,4 @@ class WeatherLocalDataSource {
     return DateTime.now().difference(lastUpdate) < maxAge;
   }
 
-  Future<void> saveSettings(SettingsData settings) async {
-    final box = Hive.box(_settingsBox);
-    await box.put(_settingsKey, settings.toJson());
-  }
-
-  SettingsData getSettings() {
-    final box = Hive.box(_settingsBox);
-    final data = box.get(_settingsKey);
-    if (data == null) return const SettingsData();
-    try {
-      return SettingsData.fromJson(
-          Map<String, dynamic>.from(data as Map));
-    } catch (_) {
-      return const SettingsData();
-    }
-  }
 }

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../../core/network/weather_api_service.dart';
 import '../../../../core/error/app_exception.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../datasources/weather_local_datasource.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../domain/weather_data.dart';
@@ -36,13 +37,13 @@ class WeatherRepositoryImpl implements WeatherRepository {
 
   @override
   bool isCacheValid() {
-    return _localDataSource.isCacheValid(const Duration(minutes: 30));
+    return _localDataSource.isCacheValid(AppConstants.cacheDuration);
   }
 
   @override
-  Future<List<LocationData>> searchCity(String query) async {
+  Future<List<LocationData>> searchCity(String query, {CancelToken? cancelToken}) async {
     try {
-      return await _apiService.searchCity(query);
+      return await _apiService.searchCity(query, cancelToken: cancelToken);
     } on DioException catch (e) {
       throw handleDioException(e);
     }

@@ -1,9 +1,14 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../domain/settings_data.dart';
 
 class SettingsLocalDataSource {
-  static const String _boxName = 'user_settings';
+  static const String _boxName = AppConstants.hiveBoxSettings;
   static const String _key = 'settings';
+
+  Future<void> init() async {
+    await Hive.openBox(_boxName);
+  }
 
   SettingsData loadSettings() {
     final box = Hive.box(_boxName);

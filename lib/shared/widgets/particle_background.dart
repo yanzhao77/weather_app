@@ -43,7 +43,8 @@ class _ParticleBackgroundState extends State<ParticleBackground>
       vsync: this,
       duration: const Duration(seconds: 60),
     )..repeat();
-    _controller.addListener(() => setState(() {}));
+    // 注意：不再 addListener(setState)。painter 以 controller 作为
+    // repaint listenable，动画只触发 CustomPaint 重绘，不重建 widget 树。
   }
 
   @override
@@ -54,9 +55,11 @@ class _ParticleBackgroundState extends State<ParticleBackground>
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ParticlePainter(_particles, widget.particleColor),
-      child: widget.child ?? const SizedBox.shrink(),
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _ParticlePainter(_particles, widget.particleColor, _controller),
+        child: widget.child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
@@ -81,7 +84,8 @@ class _ParticlePainter extends CustomPainter {
   final List<_Particle> particles;
   final Color color;
 
-  _ParticlePainter(this.particles, this.color);
+  _ParticlePainter(this.particles, this.color, Listenable repaint)
+      : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -109,5 +113,5 @@ class _ParticlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ParticlePainter oldDelegate) => true;
+  bool shouldRepaint(_ParticlePainter oldDelegate) => false;
 }

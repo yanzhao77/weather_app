@@ -7,8 +7,19 @@ class WeatherUtils {
     return 'https://openweathermap.org/img/wn/$iconCode@2x.png';
   }
 
-  static String formatTemperature(double temp) {
-    return '${temp.round()}°';
+  static String formatTemperature(double temp, {bool useCelsius = true}) {
+    if (useCelsius) return '${temp.round()}°';
+    final f = temp * 9 / 5 + 32;
+    return '${f.round()}°';
+  }
+
+  static String formatWindSpeed(double speedMs, {bool useKmh = true}) {
+    if (useKmh) return '${(speedMs * 3.6).toStringAsFixed(1)} km/h';
+    return '${speedMs.toStringAsFixed(1)} m/s';
+  }
+
+  static String formatClock(DateTime dt, {bool use24Hour = true}) {
+    return use24Hour ? DateFormat('HH:mm').format(dt) : DateFormat('h:mm a').format(dt);
   }
 
   static String formatWindDirection(int degrees) {
@@ -18,12 +29,8 @@ class WeatherUtils {
     return directions[index];
   }
 
-  static String formatTime(DateTime dt) {
-    return DateFormat('HH:mm').format(dt);
-  }
-
-  static String formatHour(DateTime dt) {
-    return DateFormat('HH').format(dt);
+  static String formatHour(DateTime dt, {bool use24Hour = true}) {
+    return use24Hour ? DateFormat('HH').format(dt) : DateFormat('ha').format(dt).toUpperCase();
   }
 
   static String formatDay(DateTime dt) {
@@ -62,6 +69,7 @@ class WeatherUtils {
   }
 
   static String getUvLevel(double uvi) {
+    if (uvi <= 0) return 'N/A';
     if (uvi <= 2) return '低';
     if (uvi <= 5) return '中等';
     if (uvi <= 7) return '高';

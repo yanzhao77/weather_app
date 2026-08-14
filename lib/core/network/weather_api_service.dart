@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:nexus_weather/core/network/api_client.dart';
 import 'package:nexus_weather/core/constants/api_endpoints.dart';
@@ -135,8 +136,11 @@ class WeatherApiService {
       double pop = 0;
       double windSpeed = 0;
       int humidity = 0;
-      String icon = items.first['weather'][0]['icon'] ?? '01d';
-      String main = items.first['weather'][0]['main'] ?? 'Clear';
+      // 用每天中间的条目（约 12:00）代表全天天气，避免取到凌晨第一条
+      final representative =
+          items[items.length ~/ 2]['weather'][0] as Map<String, dynamic>? ?? {};
+      String icon = representative['icon']?.toString() ?? '01d';
+      String main = representative['main']?.toString() ?? 'Clear';
 
       for (final item in items) {
         final temp = item['main'] as Map<String, dynamic>;
@@ -167,10 +171,11 @@ class WeatherApiService {
     }).toList();
   }
 
-  Future<List<LocationData>> searchCity(String query) async {
+  Future<List<LocationData>> searchCity(String query, {CancelToken? cancelToken}) async {
     final response = await _client.get(
       AppConstants.geoUrl + ApiEndpoints.geoDirect,
       queryParameters: {'q': query, 'limit': 5},
+      cancelToken: cancelToken,
     );
     return (response.data as List)
         .map((e) => LocationData.fromJson(e as Map<String, dynamic>))

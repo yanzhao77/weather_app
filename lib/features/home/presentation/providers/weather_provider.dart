@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/error/app_exception.dart';
 import '../../domain/weather_data.dart';
-import '../../domain/location_data.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../data/repositories/weather_repository_impl.dart';
 import '../../../../core/network/api_client.dart';
@@ -78,17 +78,18 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
       debugPrint('[NEXUS][weather] fetch success temp=${data.current.temperature}');
       state = WeatherState(data: data, isLoading: false);
     } catch (e) {
-      debugPrint('[NEXUS][weather] fetch failed: $e');
+      final message = e is AppException ? e.message : '未知错误';
+      debugPrint('[NEXUS][weather] fetch failed: $message');
       // If we had cached data, keep showing it
       if (state.data != null) {
         state = state.copyWith(
           isLoading: false,
-          error: '更新失败：$e，显示缓存数据',
+          error: '更新失败：$message，显示缓存数据',
         );
       } else {
         state = state.copyWith(
           isLoading: false,
-          error: '加载天气失败: $e',
+          error: '加载天气失败：$message',
         );
       }
     }
@@ -99,12 +100,4 @@ final weatherProvider =
     StateNotifierProvider<WeatherNotifier, WeatherState>((ref) {
   final repo = ref.read(weatherRepositoryProvider);
   return WeatherNotifier(repo);
-});
-
-// Combined provider that triggers location + weather
-final currentLocationWeatherProvider =
-    FutureProvider.family<WeatherData, LocationData>(
-        (ref, location) async {
-  final repo = ref.read(weatherRepositoryProvider);
-  return repo.getWeather(location.latitude, location.longitude);
 });

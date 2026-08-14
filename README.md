@@ -32,7 +32,8 @@ NEXUS WEATHER 是一款面向移动端的科幻风天气应用。它把实时天
 - 多日预报：聚合 OpenWeatherMap 5 day forecast 数据，生成日维度高低温和降水概率。
 - 城市搜索：支持按城市名搜索，选择后立即切换天气数据源。
 - 本地缓存：通过 Hive 保存最近一次天气结果，网络失败时继续显示缓存快照。
-- 设置面板：提供温度单位、风速单位、时间格式和通知开关等偏好入口。
+- 设置面板：温度（°C/°F）、风速（m/s、km/h）、时间格式（12/24 小时制）切换实时生效；每日 08:00 本地天气通知。
+- 本地通知：基于 flutter_local_notifications 的每日天气提醒，可随时在设置中开关。
 - 科幻 HUD 视觉：粒子背景、扫描线覆盖层、发光面板、自绘天气图标和天气态背景渐变。
 
 ## 技术栈
@@ -46,8 +47,10 @@ NEXUS WEATHER 是一款面向移动端的科幻风天气应用。它把实时天
 | Network | Dio | OpenWeatherMap API 请求封装 |
 | Location | geolocator, geocoding | 定位权限、当前位置、逆地理编码 |
 | Local Storage | Hive | 天气缓存与用户设置持久化 |
-| Charts / Visual | fl_chart, CustomPainter | HUD 数据视觉与天气图形组件 |
-| Config | flutter_dotenv | 本地环境变量加载 |
+| Notifications | flutter_local_notifications | 每日天气提醒（zonedSchedule） |
+| Visual | CustomPainter | 粒子背景、扫描线、天气图标等自绘组件 |
+| Fonts | JetBrainsMono, Orbitron | 随包分发的 OFL 字体资源 |
+| Config | flutter_dotenv / --dart-define | 环境变量与密钥注入 |
 
 ## 项目结构
 
@@ -107,9 +110,15 @@ flutter doctor
 flutter pub get
 ```
 
-### 3. 配置环境变量
+### 3. 配置 API Key
 
-项目会尝试读取 `.env/.env`。复制示例文件，并填入你的 OpenWeatherMap key：
+推荐通过 `--dart-define` 注入密钥（编译期常量，不会随应用包分发）：
+
+```bash
+flutter run --dart-define=OPENWEATHER_API_KEY=<your-key>
+```
+
+开发环境也可使用 `.env/.env`（仅本地开发，密钥不会打包进应用）：
 
 ```bash
 cp .env/.env.example .env/.env
@@ -118,7 +127,7 @@ cp .env/.env.example .env/.env
 ### 4. 运行应用
 
 ```bash
-flutter run
+flutter run --dart-define=OPENWEATHER_API_KEY=<your-key>
 ```
 
 指定设备运行：

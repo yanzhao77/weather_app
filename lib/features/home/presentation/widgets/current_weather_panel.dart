@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/weather_utils.dart';
 import '../../domain/weather_data.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../../shared/widgets/hud_panel.dart';
 import '../../../../shared/widgets/weather_icon.dart';
 
-class CurrentWeatherPanel extends StatelessWidget {
+class CurrentWeatherPanel extends ConsumerWidget {
   final CurrentWeather weather;
   final String cityName;
   final bool isFromCache;
@@ -18,7 +20,8 @@ class CurrentWeatherPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
     return HudPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -73,7 +76,10 @@ class CurrentWeatherPanel extends StatelessWidget {
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: '${weather.temperature.round()}',
+                          text: WeatherUtils.formatTemperature(
+                            weather.temperature,
+                            useCelsius: settings.useCelsius,
+                          ).replaceAll('°', ''),
                           style: const TextStyle(
                             fontFamily: 'Orbitron',
                             fontSize: 64,
@@ -83,7 +89,7 @@ class CurrentWeatherPanel extends StatelessWidget {
                           ),
                         ),
                         TextSpan(
-                          text: '°C',
+                          text: settings.useCelsius ? '°C' : '°F',
                           style: TextStyle(
                             fontFamily: 'Orbitron',
                             fontSize: 20,
@@ -119,11 +125,11 @@ class CurrentWeatherPanel extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _InfoChip(label: '体感', value: WeatherUtils.formatTemperature(weather.feelsLike)),
+                _InfoChip(label: '体感', value: WeatherUtils.formatTemperature(weather.feelsLike, useCelsius: settings.useCelsius)),
                 Container(width: 1, height: 20, color: AppColors.borderGlow),
                 _InfoChip(label: '湿度', value: '${weather.humidity}%'),
                 Container(width: 1, height: 20, color: AppColors.borderGlow),
-                _InfoChip(label: '风速', value: '${weather.windSpeed.toStringAsFixed(1)} m/s'),
+                _InfoChip(label: '风速', value: WeatherUtils.formatWindSpeed(weather.windSpeed, useKmh: settings.useKmh)),
               ],
             ),
           ),

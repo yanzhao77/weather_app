@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -5,6 +7,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/weather_utils.dart';
 import '../providers/weather_provider.dart';
 import '../providers/location_provider.dart';
+import '../../domain/location_data.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../../shared/widgets/particle_background.dart';
 import '../../../../shared/widgets/scanline_overlay.dart';
 import '../widgets/current_weather_panel.dart';
@@ -20,39 +24,65 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  Timer? _clockTimer;
+  bool _loading = false;
+
   @override
   void initState() {
     super.initState();
+    // 状态栏时钟每分钟刷新
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadWeather();
     });
   }
 
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadWeather() async {
-    final locationNotifier = ref.read(locationProvider.notifier);
-    await locationNotifier.requestLocation();
+    // 防止下拉刷新/重试时并发触发重复请求
+    if (_loading) return;
+    _loading = true;
+    try {
+      final locationNotifier = ref.read(locationProvider.notifier);
+      await locationNotifier.requestLocation();
 
-    final locationState = ref.read(locationProvider);
-    if (locationState.error != null) {
-      await _showLocationIssueDialog(locationState);
-      return;
-    }
-
-    final loc = locationState.location;
-    if (loc != null) {
-      await ref.read(weatherProvider.notifier).fetchWeather(loc.latitude, loc.longitude);
-
-      if (ref.read(weatherProvider).data != null) {
-        try {
-          final repo = ref.read(weatherRepositoryProvider);
-          final namedLoc = await repo.reverseGeocode(loc.latitude, loc.longitude);
-          locationNotifier.setLocation(namedLoc);
-        } catch (_) {}
+      final locationState = ref.read(locationProvider);
+      if (locationState.error != null) {
+        await _showLocationIssueDialog(locationState);
+        return;
       }
-    } else {
-      await _showLocationIssueDialog(
-        const LocationState(error: '未获取到手机定位，请确认定位开关与应用权限已开启'),
-      );
+
+      final loc = locationState.location;
+      if (loc == null) {
+        await _showLocationIssueDialog(
+          const LocationState(error: '未获取到手机定位，请确认定位开关与应用权限已开启'),
+        );
+        return;
+      }
+
+      // 天气请求与逆地理编码并行，缩短首屏等待
+      final weatherFuture =
+          ref.read(weatherProvider.notifier).fetchWeather(loc.latitude, loc.longitude);
+      final geoFuture = ref
+          .read(weatherRepositoryProvider)
+          .reverseGeocode(loc.latitude, loc.longitude)
+          .then<LocationData?>((v) => v)
+          .catchError((_) => null);
+
+      await Future.wait([weatherFuture]);
+      final namedLoc = await geoFuture;
+      if (namedLoc != null) {
+        locationNotifier.setLocation(namedLoc);
+      }
+    } finally {
+      _loading = false;
     }
   }
 
@@ -147,6 +177,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildStatusBar(LocationState locationState, WeatherState weatherState) {
+    final settings = ref.watch(settingsProvider);
     final loc = locationState.location;
     final statusText = locationState.isLoading
         ? '正在获取手机定位...'
@@ -166,7 +197,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         Expanded(child: Text(statusText, style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, color: AppColors.textSecondary))),
         if (weatherState.error != null && weatherState.data != null)
           Padding(padding: const EdgeInsets.only(right: 4), child: Text(weatherState.error!, style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 8, color: AppColors.warning))),
-        Text(WeatherUtils.formatTime(DateTime.now()), style: const TextStyle(fontFamily: 'Orbitron', fontSize: 11, color: AppColors.textDim, letterSpacing: 1)),
+        Text(WeatherUtils.formatClock(DateTime.now(), use24Hour: settings.use24Hour), style: const TextStyle(fontFamily: 'Orbitron', fontSize: 11, color: AppColors.textDim, letterSpacing: 1)),
       ],
     );
   }

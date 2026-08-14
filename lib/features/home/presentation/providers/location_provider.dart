@@ -80,21 +80,22 @@ class LocationNotifier extends StateNotifier<LocationState> {
         );
       }
 
+      // 优先使用系统默认（fused）定位提供方，失败再回退到 Android 旧定位管理器
       try {
         position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.low,
-          forceAndroidLocationManager: true,
           timeLimit: const Duration(seconds: 8),
         );
       } catch (e) {
-        debugPrint('[NEXUS][location] android location manager failed: $e');
+        debugPrint('[NEXUS][location] fused provider failed: $e');
         try {
           position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.medium,
+            forceAndroidLocationManager: true,
             timeLimit: const Duration(seconds: 8),
           );
         } catch (fallbackError) {
-          debugPrint('[NEXUS][location] fused provider failed: $fallbackError');
+          debugPrint('[NEXUS][location] android location manager failed: $fallbackError');
           if (position == null) rethrow;
         }
       }

@@ -1,6 +1,11 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:nexus_weather/core/constants/app_constants.dart';
 import 'package:nexus_weather/features/home/domain/location_data.dart';
 import 'package:nexus_weather/features/home/domain/repositories/weather_repository.dart';
 import 'package:nexus_weather/features/home/domain/weather_data.dart';
@@ -9,6 +14,13 @@ import 'package:nexus_weather/features/home/presentation/providers/weather_provi
 import 'package:nexus_weather/main.dart';
 
 void main() {
+  setUpAll(() async {
+    final dir = await Directory.systemTemp.createTemp('hive_widget');
+    Hive.init(dir.path);
+    await Hive.openBox(AppConstants.hiveBoxWeather);
+    await Hive.openBox(AppConstants.hiveBoxSettings);
+  });
+
   testWidgets('App should build', (WidgetTester tester) async {
     await initializeDateFormatting('zh_CN');
 
@@ -53,7 +65,9 @@ class _FakeWeatherRepository implements WeatherRepository {
   }
 
   @override
-  Future<List<LocationData>> searchCity(String query) async => const [
+  Future<List<LocationData>> searchCity(String query,
+          {CancelToken? cancelToken}) async =>
+      const [
         LocationData(name: 'Shanghai', latitude: 31.23, longitude: 121.47),
       ];
 

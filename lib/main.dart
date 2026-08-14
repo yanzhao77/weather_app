@@ -5,9 +5,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/constants/app_colors.dart';
+import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'app_router.dart';
 import 'features/home/data/datasources/weather_local_datasource.dart';
+import 'features/settings/data/datasources/settings_datasource.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,11 +35,15 @@ void main() async {
 
   await initializeDateFormatting('zh_CN');
 
-  // Initialize local data source (opens boxes)
-  final localDS = WeatherLocalDataSource();
-  await localDS.init();
+  // Initialize local data sources (open boxes)
+  await WeatherLocalDataSource().init();
+  await SettingsLocalDataSource().init();
 
-  // Load environment variables (optional)
+  // Local notifications
+  await NotificationService.init();
+
+  // Load environment variables (optional, dev only)
+  // 生产环境请使用 --dart-define=OPENWEATHER_API_KEY=xxx 注入密钥
   try {
     await dotenv.load(fileName: '.env/.env');
   } catch (_) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/notifications/notification_service.dart';
+import '../../../../shared/widgets/section_header.dart';
 import '../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -24,7 +26,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _sectionHeader('单位'),
+          const SectionHeader(title: '单位', icon: Icons.straighten),
           const SizedBox(height: 8),
           _SettingsTile(
             title: '摄氏度 (°C)',
@@ -39,7 +41,7 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (_) => ref.read(settingsProvider.notifier).toggleKmh(),
           ),
           const SizedBox(height: 24),
-          _sectionHeader('时间'),
+          const SectionHeader(title: '时间', icon: Icons.schedule),
           const SizedBox(height: 8),
           _SettingsTile(
             title: '24 小时制',
@@ -49,18 +51,26 @@ class SettingsScreen extends ConsumerWidget {
                 ref.read(settingsProvider.notifier).toggle24Hour(),
           ),
           const SizedBox(height: 24),
-          _sectionHeader('通知'),
+          const SectionHeader(title: '通知', icon: Icons.notifications),
           const SizedBox(height: 8),
           _SettingsTile(
             title: '天气通知',
-            subtitle: '接收每日天气预报推送',
+            subtitle: '每天 08:00 推送当日天气提醒',
             value: settings.showNotifications,
-            onChanged: (_) =>
-                ref.read(settingsProvider.notifier).toggleNotifications(),
+            onChanged: (_) async {
+              final notifier = ref.read(settingsProvider.notifier);
+              await notifier.toggleNotifications();
+              if (ref.read(settingsProvider).showNotifications) {
+                await NotificationService.requestPermissions();
+                await NotificationService.scheduleDailyWeatherReminder();
+              } else {
+                await NotificationService.cancelDailyWeatherReminder();
+              }
+            },
           ),
           const SizedBox(height: 32),
           // About section
-          _sectionHeader('关于'),
+          const SectionHeader(title: '关于', icon: Icons.info_outline),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
@@ -108,27 +118,6 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _sectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 2,
-          height: 14,
-          color: AppColors.accentCyan,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-            fontFamily: 'JetBrainsMono',
-            fontSize: 10,
-            color: AppColors.accentCyan,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _SettingsTile extends StatelessWidget {
