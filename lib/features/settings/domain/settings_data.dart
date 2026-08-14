@@ -6,6 +6,7 @@ class SettingsData extends Equatable {
   final bool use24Hour;
   final bool showNotifications;
   final String? defaultCity;
+  final String? apiKey;
 
   const SettingsData({
     this.useCelsius = true,
@@ -13,11 +14,12 @@ class SettingsData extends Equatable {
     this.use24Hour = true,
     this.showNotifications = false,
     this.defaultCity,
+    this.apiKey,
   });
 
   @override
   List<Object?> get props =>
-      [useCelsius, useKmh, use24Hour, showNotifications, defaultCity];
+      [useCelsius, useKmh, use24Hour, showNotifications, defaultCity, apiKey];
 
   SettingsData copyWith({
     bool? useCelsius,
@@ -25,6 +27,7 @@ class SettingsData extends Equatable {
     bool? use24Hour,
     bool? showNotifications,
     String? defaultCity,
+    String? apiKey,
   }) {
     return SettingsData(
       useCelsius: useCelsius ?? this.useCelsius,
@@ -32,6 +35,7 @@ class SettingsData extends Equatable {
       use24Hour: use24Hour ?? this.use24Hour,
       showNotifications: showNotifications ?? this.showNotifications,
       defaultCity: defaultCity ?? this.defaultCity,
+      apiKey: apiKey ?? this.apiKey,
     );
   }
 
@@ -42,6 +46,7 @@ class SettingsData extends Equatable {
       use24Hour: json['use24Hour'] as bool? ?? true,
       showNotifications: json['showNotifications'] as bool? ?? false,
       defaultCity: json['defaultCity'] as String?,
+      apiKey: json['apiKey'] as String?,
     );
   }
 
@@ -51,5 +56,6 @@ class SettingsData extends Equatable {
         'use24Hour': use24Hour,
         'showNotifications': showNotifications,
         'defaultCity': defaultCity,
+        'apiKey': apiKey,
       };
 }

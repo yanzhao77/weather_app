@@ -11,6 +11,8 @@ import 'app_router.dart';
 import 'features/home/data/datasources/weather_local_datasource.dart';
 import 'features/home/data/datasources/locations_datasource.dart';
 import 'features/settings/data/datasources/settings_datasource.dart';
+import 'features/settings/presentation/providers/settings_provider.dart';
+import 'features/setup/presentation/screens/api_key_setup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,11 +61,33 @@ void main() async {
   );
 }
 
-class NexusWeatherApp extends StatelessWidget {
+class NexusWeatherApp extends ConsumerStatefulWidget {
   const NexusWeatherApp({super.key});
 
   @override
+  ConsumerState<NexusWeatherApp> createState() => _NexusWeatherAppState();
+}
+
+class _NexusWeatherAppState extends ConsumerState<NexusWeatherApp> {
+  bool _skipSetup = false;
+
+  @override
   Widget build(BuildContext context) {
+    // 未配置 API Key 且未跳过时，先展示引导页让用户填写
+    final hasKey = ref.watch(apiKeyProvider)?.isNotEmpty ?? false;
+    final needsSetup = !hasKey && !_skipSetup;
+
+    if (needsSetup) {
+      return MaterialApp(
+        title: 'Nexus Weather',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        home: ApiKeySetupScreen(
+          onSkip: () => setState(() => _skipSetup = true),
+        ),
+      );
+    }
+
     return MaterialApp.router(
       title: 'Nexus Weather',
       debugShowCheckedModeBanner: false,

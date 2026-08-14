@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/app_exception.dart';
+import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../domain/weather_data.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../data/repositories/weather_repository_impl.dart';
@@ -13,7 +14,12 @@ String locationKey(double lat, double lng) =>
     '${lat.toStringAsFixed(4)},${lng.toStringAsFixed(4)}';
 
 // Service & Repository providers
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+final apiClientProvider = Provider<ApiClient>((ref) {
+  // 每次请求动态解析 key：支持应用内运行时配置，无需重新打包
+  return ApiClient(
+    apiKeyResolver: () => ref.read(apiKeyProvider) ?? '',
+  );
+});
 
 final weatherApiServiceProvider =
     Provider<WeatherApiService>((ref) {

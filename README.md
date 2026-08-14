@@ -108,9 +108,11 @@ flutter doctor
 flutter pub get
 ```
 
-### 3. 配置 API Key
+### 3. 配置 API Key（可选，可留空）
 
-推荐通过 `--dart-define` 注入密钥（编译期常量，不会随应用包分发）：
+**API Key 可以不打包**：如果未通过编译参数注入，App 启动时会显示引导页，直接在应用内填写（掩码显示、不可复制），也可在「设置 → API Key」中随时配置/修改/清除。
+
+构建/运行时指定密钥（推荐，key 不落盘）：
 
 ```bash
 flutter run --dart-define=OPENWEATHER_API_KEY=<your-key>
@@ -125,7 +127,8 @@ cp .env/.env.example .env/.env
 ### 4. 运行应用
 
 ```bash
-flutter run --dart-define=OPENWEATHER_API_KEY=<your-key>
+flutter run   # 无 key 时应用内引导配置
+flutter run --dart-define=OPENWEATHER_API_KEY=<your-key>   # 或注入 key
 ```
 
 指定设备运行：

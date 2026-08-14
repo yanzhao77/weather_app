@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/notifications/notification_service.dart';
@@ -69,6 +70,13 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 32),
+          const SectionHeader(title: 'API Key', icon: Icons.key),
+          const SizedBox(height: 8),
+          _ApiKeyTile(
+            apiKey: settings.apiKey,
+            onTap: () => _showApiKeyDialog(context, ref),
+          ),
+          const SizedBox(height: 32),
           // About section
           const SectionHeader(title: '关于', icon: Icons.info_outline),
           const SizedBox(height: 8),
@@ -118,6 +126,130 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showApiKeyDialog(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgSecondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: AppColors.accentCyan.withValues(alpha: 0.35)),
+        ),
+        title: const Text(
+          '配置 API Key',
+          style: TextStyle(fontFamily: 'Orbitron', fontSize: 15, color: AppColors.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '密钥仅用于请求天气数据，输入后以掩码显示，不可复制。',
+              style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, height: 1.5, color: AppColors.textDim),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
+              enableInteractiveSelection: false,
+              contextMenuBuilder: (context, editableTextState) =>
+                  const SizedBox.shrink(),
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(RegExp(r'\s')),
+              ],
+              style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13, color: AppColors.textPrimary, letterSpacing: 2),
+              decoration: InputDecoration(
+                hintText: '输入 API Key',
+                hintStyle: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, color: AppColors.textDim),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.borderGlow, width: 0.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.accentCyan, width: 0.8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(''),
+            child: const Text('清除', style: TextStyle(color: AppColors.accentPink)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('保存', style: TextStyle(color: AppColors.accentCyan)),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (result == null) return; // 取消
+    await ref.read(settingsProvider.notifier).setApiKey(result);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.isEmpty ? '已清除 API Key' : 'API Key 已保存',
+            style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11),
+          ),
+          backgroundColor: AppColors.accentCyan.withValues(alpha: 0.85),
+        ),
+      );
+    }
+  }
+
+}
+
+class _ApiKeyTile extends StatelessWidget {
+  final String? apiKey;
+  final VoidCallback onTap;
+
+  const _ApiKeyTile({required this.apiKey, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final configured = apiKey != null && apiKey!.isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.borderGlow, width: 0.2),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(
+          Icons.key,
+          size: 18,
+          color: configured ? AppColors.accentCyan : AppColors.textDim,
+        ),
+        title: const Text(
+          'API Key',
+          style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13, color: AppColors.textPrimary),
+        ),
+        subtitle: Text(
+          configured ? '已配置（掩码显示，不可查看/复制）' : '未配置，点击设置',
+          style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textDim),
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          size: 18,
+          color: configured ? AppColors.accentCyan : AppColors.textDim,
+        ),
+      ),
+    );
+  }
 }
 
 class _SettingsTile extends StatelessWidget {

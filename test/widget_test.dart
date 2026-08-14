@@ -11,6 +11,7 @@ import 'package:nexus_weather/features/home/domain/repositories/weather_reposito
 import 'package:nexus_weather/features/home/domain/weather_data.dart';
 import 'package:nexus_weather/features/home/presentation/providers/location_provider.dart';
 import 'package:nexus_weather/features/home/presentation/providers/weather_provider.dart';
+import 'package:nexus_weather/features/settings/presentation/providers/settings_provider.dart';
 import 'package:nexus_weather/main.dart';
 
 void main() {
@@ -31,6 +32,8 @@ void main() {
           locationProvider.overrideWith((ref) => _FakeLocationNotifier()),
           weatherRepositoryProvider
               .overrideWith((ref) => _FakeWeatherRepository()),
+          // 提供 key，确保进入主应用而非 API Key 引导页
+          apiKeyProvider.overrideWith((ref) => 'test-key'),
         ],
         child: const NexusWeatherApp(),
       ),
