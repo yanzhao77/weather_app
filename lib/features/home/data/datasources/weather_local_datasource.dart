@@ -4,22 +4,26 @@ import '../../domain/weather_data.dart';
 
 class WeatherLocalDataSource {
   static const String _weatherBox = AppConstants.hiveBoxWeather;
-  static const String _weatherKey = 'current_weather';
-  static const String _lastUpdateKey = 'last_update';
+  static const String _lastUpdateKeyPrefix = 'last_update_';
 
   Future<void> init() async {
     await Hive.openBox(_weatherBox);
   }
 
-  Future<void> cacheWeatherData(WeatherData data) async {
+  static String _weatherKey(String locationKey) => 'weather_$locationKey';
+  static String _lastUpdateKey(String locationKey) => '$_lastUpdateKeyPrefix$locationKey';
+
+  Future<void> cacheWeatherData(WeatherData data, String locationKey) async {
     final box = Hive.box(_weatherBox);
-    await box.put(_weatherKey, data.toJson());
-    await box.put(_lastUpdateKey, DateTime.now().toIso8601String());
+    await box.putAll({
+      _weatherKey(locationKey): data.toJson(),
+      _lastUpdateKey(locationKey): DateTime.now().toIso8601String(),
+    });
   }
 
-  WeatherData? getCachedWeather() {
+  WeatherData? getCachedWeather(String locationKey) {
     final box = Hive.box(_weatherBox);
-    final data = box.get(_weatherKey);
+    final data = box.get(_weatherKey(locationKey));
     if (data == null) return null;
     try {
       return WeatherData.fromJson(Map<String, dynamic>.from(data as Map));
@@ -28,15 +32,15 @@ class WeatherLocalDataSource {
     }
   }
 
-  DateTime? getLastUpdateTime() {
+  DateTime? getLastUpdateTime(String locationKey) {
     final box = Hive.box(_weatherBox);
-    final time = box.get(_lastUpdateKey) as String?;
+    final time = box.get(_lastUpdateKey(locationKey)) as String?;
     if (time == null) return null;
     return DateTime.tryParse(time);
   }
 
-  bool isCacheValid(Duration maxAge) {
-    final lastUpdate = getLastUpdateTime();
+  bool isCacheValid(String locationKey, Duration maxAge) {
+    final lastUpdate = getLastUpdateTime(locationKey);
     if (lastUpdate == null) return false;
     return DateTime.now().difference(lastUpdate) < maxAge;
   }

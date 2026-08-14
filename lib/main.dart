@@ -9,6 +9,7 @@ import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'app_router.dart';
 import 'features/home/data/datasources/weather_local_datasource.dart';
+import 'features/home/data/datasources/locations_datasource.dart';
 import 'features/settings/data/datasources/settings_datasource.dart';
 
 void main() async {
@@ -38,6 +39,7 @@ void main() async {
   // Initialize local data sources (open boxes)
   await WeatherLocalDataSource().init();
   await SettingsLocalDataSource().init();
+  await LocationsDataSource().init();
 
   // Local notifications
   await NotificationService.init();

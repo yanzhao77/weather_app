@@ -47,24 +47,30 @@ void main() {
       );
 
   test('写入后可读取，字段完整', () async {
-    await ds.cacheWeatherData(sampleData());
-    final cached = ds.getCachedWeather();
+    await ds.cacheWeatherData(sampleData(), 'beijing');
+    final cached = ds.getCachedWeather('beijing');
     expect(cached, isNotNull);
     expect(cached!.current.temperature, 28);
     expect(cached.current.weatherMain, 'Clear');
     expect(cached.hourly, isEmpty);
   });
 
+  test('不同地区缓存相互独立', () async {
+    await ds.cacheWeatherData(sampleData(), 'beijing');
+    expect(ds.getCachedWeather('shanghai'), isNull);
+    expect(ds.getCachedWeather('beijing'), isNotNull);
+  });
+
   test('缓存时效判断', () async {
-    expect(ds.isCacheValid(const Duration(minutes: 30)), isFalse);
-    await ds.cacheWeatherData(sampleData());
-    expect(ds.isCacheValid(const Duration(minutes: 30)), isTrue);
-    expect(ds.isCacheValid(const Duration(seconds: 0)), isFalse);
+    expect(ds.isCacheValid('beijing', const Duration(minutes: 30)), isFalse);
+    await ds.cacheWeatherData(sampleData(), 'beijing');
+    expect(ds.isCacheValid('beijing', const Duration(minutes: 30)), isTrue);
+    expect(ds.isCacheValid('beijing', const Duration(seconds: 0)), isFalse);
   });
 
   test('损坏数据返回 null 而不是抛异常', () async {
     final box = Hive.box('weather_cache');
-    await box.put('current_weather', {'broken': true});
-    expect(ds.getCachedWeather(), isNull);
+    await box.put('weather_broken', {'broken': true});
+    expect(ds.getCachedWeather('broken'), isNull);
   });
 }

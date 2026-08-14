@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/search_provider.dart';
+import '../../../home/domain/location_data.dart';
 import '../../../home/presentation/providers/location_provider.dart';
 import '../../../home/presentation/providers/weather_provider.dart';
+import '../../../home/presentation/providers/locations_provider.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -40,6 +42,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  Future<void> _useCurrentLocation() async {
+    final locationNotifier = ref.read(locationProvider.notifier);
+    await locationNotifier.requestLocation();
+    final loc = ref.read(locationProvider).location;
+    if (loc == null || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('获取定位失败，请检查定位权限',
+                style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11)),
+            backgroundColor: AppColors.warning.withValues(alpha: 0.9),
+          ),
+        );
+      }
+      return;
+    }
+    LocationData named = loc;
+    try {
+      named = await ref
+          .read(weatherRepositoryProvider)
+          .reverseGeocode(loc.latitude, loc.longitude);
+    } catch (_) {}
+    final index = ref.read(locationsProvider.notifier).add(named);
+    ref
+        .read(weatherProvider(
+                locationKey(named.latitude, named.longitude))
+            .notifier)
+        .fetchWeather(named.latitude, named.longitude);
+    if (mounted) Navigator.pop(context, index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
@@ -61,13 +94,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 controller: _controller,
                 onChanged: _onSearch,
                 style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 14, color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '输入城市名称...',
-                  hintStyle: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 14, color: AppColors.textDim),
-                  prefixIcon: Icon(Icons.search, color: AppColors.accentCyan, size: 18),
-                  suffixIcon: Icon(Icons.my_location, color: AppColors.textDim, size: 16),
+                  hintStyle: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 14, color: AppColors.textDim),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.accentCyan, size: 18),
+                  suffixIcon: IconButton(
+                    tooltip: '使用当前位置',
+                    constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                    padding: EdgeInsets.zero,
+                    onPressed: _useCurrentLocation,
+                    icon: const Icon(Icons.my_location, color: AppColors.accentCyan, size: 16),
+                  ),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
               ),
             ),
@@ -106,12 +145,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textDim),
           ),
           onTap: () {
-            ref.read(locationProvider.notifier).setLocation(location);
-            ref.read(weatherProvider.notifier).fetchWeather(
-                  location.latitude,
-                  location.longitude,
-                );
-            Navigator.pop(context);
+            // 添加到地区列表，首页会自动跳转到新地区
+            final index =
+                ref.read(locationsProvider.notifier).add(location);
+            ref
+                .read(weatherProvider(
+                        locationKey(location.latitude, location.longitude))
+                    .notifier)
+                .fetchWeather(location.latitude, location.longitude);
+            Navigator.pop(context, index);
           },
         );
       },

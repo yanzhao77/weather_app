@@ -8,6 +8,10 @@ import '../../../../core/network/api_client.dart';
 import '../../data/datasources/weather_local_datasource.dart';
 import '../../../../core/network/weather_api_service.dart';
 
+/// 生成地区缓存/状态 key（经纬度取 4 位小数，稳定且唯一）
+String locationKey(double lat, double lng) =>
+    '${lat.toStringAsFixed(4)},${lng.toStringAsFixed(4)}';
+
 // Service & Repository providers
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
@@ -58,23 +62,30 @@ class WeatherState {
 
 class WeatherNotifier extends StateNotifier<WeatherState> {
   final WeatherRepository _repository;
+  final String _locationKey;
 
-  WeatherNotifier(this._repository) : super(const WeatherState()) {
+  WeatherNotifier(this._repository, this._locationKey)
+      : super(const WeatherState()) {
     _loadCachedData();
   }
 
   void _loadCachedData() {
-    final cached = _repository.getCachedWeather();
+    final cached = _repository.getCachedWeather(_locationKey);
     if (cached != null) {
       state = state.copyWith(data: cached, isFromCache: true);
     }
   }
 
-  Future<void> fetchWeather(double lat, double lng) async {
+  Future<void> fetchWeather(double lat, double lng, {bool force = false}) async {
+    // 缓存未过期时直接展示缓存，避免滑动切换重复请求
+    if (!force && state.data != null && _repository.isCacheValid(_locationKey)) {
+      return;
+    }
     state = state.copyWith(isLoading: true, error: null);
-    debugPrint('[NEXUS][weather] fetch started lat=$lat lng=$lng');
+    debugPrint('[NEXUS][weather] fetch started lat=$lat lng=$lng key=$_locationKey');
     try {
-      final data = await _repository.getWeather(lat, lng);
+      final data =
+          await _repository.getWeather(lat, lng, cacheKey: _locationKey);
       debugPrint('[NEXUS][weather] fetch success temp=${data.current.temperature}');
       state = WeatherState(data: data, isLoading: false);
     } catch (e) {
@@ -97,7 +108,8 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
 }
 
 final weatherProvider =
-    StateNotifierProvider<WeatherNotifier, WeatherState>((ref) {
+    StateNotifierProvider.family<WeatherNotifier, WeatherState, String>(
+        (ref, locationKey) {
   final repo = ref.read(weatherRepositoryProvider);
-  return WeatherNotifier(repo);
+  return WeatherNotifier(repo, locationKey);
 });

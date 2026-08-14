@@ -26,12 +26,13 @@ NEXUS WEATHER 是一款面向移动端的科幻风天气应用。它把实时天
 
 ## 核心能力
 
-- 当前位置天气：启动后请求定位权限，自动获取经纬度并反查城市名称。
+- 多地区天气：搜索城市或使用当前位置添加多个地区，左右滑动切换查看，支持删除。
 - 实时天气面板：展示温度、体感温度、天气状态、湿度、风速、气压、能见度、日出日落等关键指标。
 - 逐小时预报：横向信息条展示未来多个时间点的温度和天气趋势。
 - 多日预报：聚合 OpenWeatherMap 5 day forecast 数据，生成日维度高低温和降水概率。
-- 城市搜索：支持按城市名搜索，选择后立即切换天气数据源。
-- 本地缓存：通过 Hive 保存最近一次天气结果，网络失败时继续显示缓存快照。
+- 逼真天气特效：下雨、下雪、雷暴（含闪电闪烁）、雾霾全屏粒子特效，随当前天气自动切换。
+- 城市搜索：支持按城市名搜索，选择后添加到地区列表。
+- 本地缓存：按地区维度通过 Hive 保存天气快照，网络失败时继续显示缓存数据。
 - 设置面板：温度（°C/°F）、风速（m/s、km/h）、时间格式（12/24 小时制）切换实时生效；每日 08:00 本地天气通知。
 - 本地通知：基于 flutter_local_notifications 的每日天气提醒，可随时在设置中开关。
 - 科幻 HUD 视觉：粒子背景、扫描线覆盖层、发光面板、自绘天气图标和天气态背景渐变。
@@ -74,17 +75,14 @@ lib/
 ## 数据流
 
 ```text
-HomeScreen / SearchScreen
+HomeScreen (PageView) / SearchScreen
         |
         v
 Riverpod Notifier / Provider
-        |
-        v
-WeatherRepository
-        |
-        +-- WeatherApiService -> OpenWeatherMap /weather, /forecast, /geo
-        |
-        +-- WeatherLocalDataSource -> Hive cache
+   |-- LocationsNotifier -> LocationsDataSource (多地区列表)
+   |-- WeatherNotifier(family) -> WeatherRepository
+                                    +-- WeatherApiService -> OpenWeatherMap
+                                    +-- WeatherLocalDataSource -> Hive cache (按地区 key)
 ```
 
 应用优先请求远端天气数据，请求成功后写入 Hive。网络请求失败时，如果本地存在缓存，界面会保留缓存数据并提示同步失败；如果没有缓存，则展示错误状态和重试入口。

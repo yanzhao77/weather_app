@@ -11,6 +11,7 @@ class AppConstants {
   static const Duration cacheDuration = Duration(minutes: 30);
   static const String hiveBoxWeather = 'weather_cache';
   static const String hiveBoxSettings = 'user_settings';
+  static const String hiveBoxLocations = 'saved_locations';
 
   // Default location (Beijing)
   static const double defaultLat = 39.9042;

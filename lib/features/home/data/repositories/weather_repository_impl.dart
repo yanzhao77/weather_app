@@ -14,30 +14,30 @@ class WeatherRepositoryImpl implements WeatherRepository {
   WeatherRepositoryImpl(this._apiService, this._localDataSource);
 
   @override
-  Future<WeatherData> getWeather(double lat, double lng) async {
+  Future<WeatherData> getWeather(double lat, double lng, {String cacheKey = 'default'}) async {
     try {
       final data = await _apiService.getWeather(lat, lng);
-      await _localDataSource.cacheWeatherData(data);
+      await _localDataSource.cacheWeatherData(data, cacheKey);
       return data;
     } on DioException catch (e) {
-      final cached = _localDataSource.getCachedWeather();
+      final cached = _localDataSource.getCachedWeather(cacheKey);
       if (cached != null) return cached;
       throw handleDioException(e);
     } catch (e) {
-      final cached = _localDataSource.getCachedWeather();
+      final cached = _localDataSource.getCachedWeather(cacheKey);
       if (cached != null) return cached;
       rethrow;
     }
   }
 
   @override
-  WeatherData? getCachedWeather() {
-    return _localDataSource.getCachedWeather();
+  WeatherData? getCachedWeather(String cacheKey) {
+    return _localDataSource.getCachedWeather(cacheKey);
   }
 
   @override
-  bool isCacheValid() {
-    return _localDataSource.isCacheValid(AppConstants.cacheDuration);
+  bool isCacheValid(String cacheKey) {
+    return _localDataSource.isCacheValid(cacheKey, AppConstants.cacheDuration);
   }
 
   @override

@@ -2,15 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/weather_utils.dart';
 import '../providers/weather_provider.dart';
 import '../providers/location_provider.dart';
+import '../providers/locations_provider.dart';
 import '../../domain/location_data.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
 import '../../../../shared/widgets/particle_background.dart';
 import '../../../../shared/widgets/scanline_overlay.dart';
+import '../../../../shared/widgets/weather_effect_overlay.dart';
 import '../widgets/current_weather_panel.dart';
 import '../widgets/hourly_forecast_bar.dart';
 import '../widgets/daily_forecast_list.dart';
@@ -26,6 +28,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   Timer? _clockTimer;
   bool _loading = false;
+  late final PageController _pageController;
 
   @override
   void initState() {
@@ -34,84 +37,218 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    _pageController =
+        PageController(initialPage: ref.read(locationsProvider).currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadWeather();
+      _ensureInitialLocation();
     });
   }
 
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadWeather() async {
-    // 防止下拉刷新/重试时并发触发重复请求
+  /// 首次进入：已有地区直接加载；空列表则尝试定位添加第一个地区
+  Future<void> _ensureInitialLocation() async {
+    final locations = ref.read(locationsProvider).locations;
+    if (locations.isNotEmpty) {
+      await _loadWeatherForIndex(ref.read(locationsProvider).currentIndex);
+      return;
+    }
+
+    // 空列表：尝试用定位添加首个地区
+    final locationNotifier = ref.read(locationProvider.notifier);
+    await locationNotifier.requestLocation();
+    final loc = ref.read(locationProvider).location;
+    if (loc == null || !mounted) return; // 定位失败则停留在空状态页
+
+    LocationData named = loc;
+    try {
+      named = await ref
+          .read(weatherRepositoryProvider)
+          .reverseGeocode(loc.latitude, loc.longitude);
+    } catch (_) {}
+
+    final index = ref.read(locationsProvider.notifier).add(named);
+    _jumpToPage(index);
+    await _loadWeatherForIndex(index);
+  }
+
+  void _jumpToPage(int index) {
+    if (!mounted) return;
+    ref.read(locationsProvider.notifier).setCurrentIndex(index);
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    }
+  }
+
+  Future<void> _loadWeatherForIndex(int index) async {
+    final locations = ref.read(locationsProvider).locations;
+    if (index < 0 || index >= locations.length) return;
+    final loc = locations[index];
+    await ref
+        .read(weatherProvider(locationKey(loc.latitude, loc.longitude)).notifier)
+        .fetchWeather(loc.latitude, loc.longitude);
+  }
+
+  Future<void> _onRefresh() async {
     if (_loading) return;
     _loading = true;
     try {
-      final locationNotifier = ref.read(locationProvider.notifier);
-      await locationNotifier.requestLocation();
-
-      final locationState = ref.read(locationProvider);
-      if (locationState.error != null) {
-        await _showLocationIssueDialog(locationState);
-        return;
-      }
-
-      final loc = locationState.location;
-      if (loc == null) {
-        await _showLocationIssueDialog(
-          const LocationState(error: '未获取到手机定位，请确认定位开关与应用权限已开启'),
-        );
-        return;
-      }
-
-      // 天气请求与逆地理编码并行，缩短首屏等待
-      final weatherFuture =
-          ref.read(weatherProvider.notifier).fetchWeather(loc.latitude, loc.longitude);
-      final geoFuture = ref
-          .read(weatherRepositoryProvider)
-          .reverseGeocode(loc.latitude, loc.longitude)
-          .then<LocationData?>((v) => v)
-          .catchError((_) => null);
-
-      await Future.wait([weatherFuture]);
-      final namedLoc = await geoFuture;
-      if (namedLoc != null) {
-        locationNotifier.setLocation(namedLoc);
-      }
+      final index = ref.read(locationsProvider).currentIndex;
+      final locations = ref.read(locationsProvider).locations;
+      if (index < 0 || index >= locations.length) return;
+      final loc = locations[index];
+      await ref
+          .read(weatherProvider(locationKey(loc.latitude, loc.longitude)).notifier)
+          .fetchWeather(loc.latitude, loc.longitude, force: true);
     } finally {
       _loading = false;
     }
   }
 
-  Future<void> _onRefresh() async {
-    await _loadWeather();
+  Future<void> _addLocation() async {
+    await context.push('/search');
+    // 返回后若新增了地区，跳转到新添加的那页
+    final state = ref.read(locationsProvider);
+    if (state.locations.isNotEmpty && mounted) {
+      _jumpToPage(state.currentIndex);
+      await _loadWeatherForIndex(state.currentIndex);
+    }
+  }
+
+  Future<void> _removeCurrentLocation() async {
+    final locations = ref.read(locationsProvider).locations;
+    if (locations.length <= 1) return;
+    final index = ref.read(locationsProvider).currentIndex;
+    final name = locations[index].name.isEmpty ? '当前城市' : locations[index].name;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgSecondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: AppColors.accentPink.withValues(alpha: 0.45)),
+        ),
+        title: const Text('删除地区',
+            style: TextStyle(fontFamily: 'Orbitron', fontSize: 15, color: AppColors.textPrimary)),
+        content: Text('确定删除 $name 吗？',
+            style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除', style: TextStyle(color: AppColors.accentPink)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final notifier = ref.read(locationsProvider.notifier);
+    notifier.removeAt(index);
+    final newIndex = ref.read(locationsProvider).currentIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pageController.hasClients) {
+        _pageController.jumpToPage(newIndex);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final weatherState = ref.watch(weatherProvider);
-    final locationState = ref.watch(locationProvider);
+    final locationsState = ref.watch(locationsProvider);
+    final locations = locationsState.locations;
+    final currentIndex = locationsState.currentIndex;
+
+    // 当前页地区与天气状态（决定背景渐变与天气特效）
+    LocationData? currentLoc;
+    WeatherState? currentWeatherState;
+    if (locations.isNotEmpty && currentIndex < locations.length) {
+      currentLoc = locations[currentIndex];
+      currentWeatherState = ref.watch(
+        weatherProvider(locationKey(currentLoc.latitude, currentLoc.longitude)),
+      );
+    }
 
     return Scaffold(
       body: Stack(
         children: [
-          _buildAnimatedBackground(weatherState.data?.current.weatherMain),
+          _buildAnimatedBackground(currentWeatherState?.data?.current.weatherMain),
           const ParticleBackground(particleCount: 40),
           const ScanlineOverlay(),
           SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _onRefresh,
-              color: AppColors.accentCyan,
-              backgroundColor: AppColors.bgSecondary,
-              child: _buildContent(weatherState, locationState),
-            ),
+            child: locations.isEmpty
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    onRefresh: _onRefresh,
+                    color: AppColors.accentCyan,
+                    backgroundColor: AppColors.bgSecondary,
+                    child: _buildPageView(locations),
+                  ),
           ),
-          if ((weatherState.isLoading || locationState.isLoading) && weatherState.data == null)
-            _buildLoadingOverlay(locationState.isLoading ? 'LOCATING...' : 'INITIALIZING...'),
+          if (currentWeatherState?.data != null)
+            WeatherEffectOverlay(
+              weatherMain: currentWeatherState!.data!.current.weatherMain,
+            ),
+          if (locations.length > 1)
+            _buildPageIndicator(locations.length, currentIndex),
+          if (currentWeatherState != null &&
+              currentWeatherState.isLoading &&
+              currentWeatherState.data == null)
+            _buildLoadingOverlay('INITIALIZING...'),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPageView(List<LocationData> locations) {
+    return PageView.builder(
+      controller: _pageController,
+      onPageChanged: (index) {
+        ref.read(locationsProvider.notifier).setCurrentIndex(index);
+        _loadWeatherForIndex(index);
+      },
+      itemCount: locations.length,
+      itemBuilder: (context, index) {
+        final loc = locations[index];
+        final ws = ref.watch(
+          weatherProvider(locationKey(loc.latitude, loc.longitude)),
+        );
+        return _buildPageContent(loc, ws);
+      },
+    );
+  }
+
+  Widget _buildPageIndicator(int total, int current) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 10,
+      child: IgnorePointer(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(total, (i) {
+            final active = i == current;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 16 : 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: active ? AppColors.accentCyan : AppColors.textDim.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -132,23 +269,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildContent(WeatherState weatherState, LocationState locationState) {
+  Widget _buildPageContent(LocationData loc, WeatherState weatherState) {
     if (weatherState.isLoading && weatherState.data == null) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentCyan, strokeWidth: 1.5));
-    }
-    if (locationState.error != null && locationState.location == null && weatherState.data == null) {
-      return _buildLocationErrorState(locationState);
     }
     if (weatherState.error != null && weatherState.data == null) {
       return _buildErrorState(weatherState.error!);
     }
     final data = weatherState.data;
-    if (data == null) return _buildInitialState();
+    if (data == null) return _buildInitialState(loc);
 
-    final loc = locationState.location;
-    final cityName = (loc != null && loc.name.isNotEmpty)
+    final cityName = loc.name.isNotEmpty
         ? loc.name
-        : (loc != null ? '${loc.latitude.toStringAsFixed(2)}, ${loc.longitude.toStringAsFixed(2)}' : '未知');
+        : '${loc.latitude.toStringAsFixed(2)}, ${loc.longitude.toStringAsFixed(2)}';
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -157,10 +290,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          _buildStatusBar(locationState, weatherState),
-          if (locationState.error != null || weatherState.error != null) ...[
+          _buildStatusBar(loc, weatherState),
+          if (weatherState.error != null) ...[
             const SizedBox(height: 10),
-            _buildInlineAlert(locationState, weatherState),
+            _buildInlineAlert(weatherState.error!),
           ],
           const SizedBox(height: 16),
           CurrentWeatherPanel(weather: data.current, cityName: cityName, isFromCache: weatherState.isFromCache),
@@ -176,74 +309,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildStatusBar(LocationState locationState, WeatherState weatherState) {
+  Widget _buildStatusBar(LocationData loc, WeatherState weatherState) {
     final settings = ref.watch(settingsProvider);
-    final loc = locationState.location;
-    final statusText = locationState.isLoading
-        ? '正在获取手机定位...'
-        : (weatherState.isLoading
-            ? '正在同步天气数据...'
-            : (locationState.error ?? ((loc != null && loc.name.isNotEmpty) ? loc.name : '定位完成')));
+    final canDelete = ref.watch(locationsProvider).locations.length > 1;
+    final statusText = weatherState.isLoading
+        ? '正在同步天气数据...'
+        : (loc.name.isNotEmpty ? loc.name : '未知位置');
     return Row(
       children: [
         Container(width: 6, height: 6,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: (locationState.error != null || weatherState.error != null) ? AppColors.warning : AppColors.success,
-            boxShadow: [BoxShadow(color: ((locationState.error != null || weatherState.error != null) ? AppColors.warning : AppColors.success).withValues(alpha: 0.5), blurRadius: 4)],
+            color: weatherState.error != null ? AppColors.warning : AppColors.success,
+            boxShadow: [BoxShadow(color: (weatherState.error != null ? AppColors.warning : AppColors.success).withValues(alpha: 0.5), blurRadius: 4)],
           ),
         ),
         const SizedBox(width: 8),
         Expanded(child: Text(statusText, style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, color: AppColors.textSecondary))),
         if (weatherState.error != null && weatherState.data != null)
           Padding(padding: const EdgeInsets.only(right: 4), child: Text(weatherState.error!, style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 8, color: AppColors.warning))),
+        IconButton(
+          tooltip: '添加地区',
+          constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          padding: EdgeInsets.zero,
+          onPressed: _addLocation,
+          icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.accentCyan),
+        ),
+        if (canDelete)
+          IconButton(
+            tooltip: '删除当前地区',
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            padding: EdgeInsets.zero,
+            onPressed: _removeCurrentLocation,
+            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.accentPink),
+          ),
+        const SizedBox(width: 4),
         Text(WeatherUtils.formatClock(DateTime.now(), use24Hour: settings.use24Hour), style: const TextStyle(fontFamily: 'Orbitron', fontSize: 11, color: AppColors.textDim, letterSpacing: 1)),
       ],
     );
   }
 
-  Future<void> _showLocationIssueDialog(LocationState locationState) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgSecondary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: AppColors.warning.withValues(alpha: 0.45)),
-        ),
-        title: const Text(
-          '需要获取位置信息',
-          style: TextStyle(fontFamily: 'Orbitron', fontSize: 15, color: AppColors.textPrimary),
-        ),
-        content: Text(
-          locationState.error ?? '请允许定位权限，并确认手机定位服务已开启。',
-          style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('稍后'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              if (locationState.permissionDenied) {
-                await Geolocator.openAppSettings();
-              } else {
-                await Geolocator.openLocationSettings();
-              }
-            },
-            child: const Text('去开启'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInlineAlert(LocationState locationState, WeatherState weatherState) {
-    final message = locationState.error ?? weatherState.error ?? '';
-    final isLocationIssue = locationState.error != null;
+  Widget _buildInlineAlert(String error) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -254,11 +360,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       child: Row(
         children: [
-          Icon(isLocationIssue ? Icons.location_off : Icons.cloud_off, size: 16, color: AppColors.warning),
+          const Icon(Icons.cloud_off, size: 16, color: AppColors.warning),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              message,
+              error,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textSecondary),
@@ -266,19 +372,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            tooltip: isLocationIssue ? '定位设置' : '重新同步',
+            tooltip: '重新同步',
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
-            onPressed: isLocationIssue
-                ? () async {
-                    if (locationState.permissionDenied) {
-                      await Geolocator.openAppSettings();
-                    } else {
-                      await Geolocator.openLocationSettings();
-                    }
-                  }
-                : _onRefresh,
-            icon: Icon(isLocationIssue ? Icons.settings : Icons.refresh, size: 16, color: AppColors.accentCyan),
+            onPressed: _onRefresh,
+            icon: const Icon(Icons.refresh, size: 16, color: AppColors.accentCyan),
           ),
         ],
       ),
@@ -301,45 +399,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildLocationErrorState(LocationState locationState) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.location_off, size: 48, color: AppColors.warning),
-            const SizedBox(height: 16),
-            const Text('需要定位权限', style: TextStyle(fontFamily: 'Orbitron', fontSize: 14, color: AppColors.textPrimary, letterSpacing: 1)),
-            const SizedBox(height: 8),
-            Text(
-              locationState.error ?? '请允许定位权限后重新获取天气数据',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textDim),
+  /// 无任何地区时的引导页
+  Widget _buildEmptyState() {
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      color: AppColors.accentCyan,
+      backgroundColor: AppColors.bgSecondary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const SizedBox(height: 120),
+          const Icon(Icons.add_location_alt_outlined, size: 56, color: AppColors.accentCyanDim),
+          const SizedBox(height: 20),
+          const Center(
+            child: Text('添加城市查看天气',
+                style: TextStyle(fontFamily: 'Orbitron', fontSize: 15, color: AppColors.textPrimary, letterSpacing: 1)),
+          ),
+          const SizedBox(height: 8),
+          const Center(
+            child: Text('支持搜索城市，或使用当前位置',
+                style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11, color: AppColors.textDim)),
+          ),
+          const SizedBox(height: 28),
+          Center(
+            child: FilledButton.icon(
+              onPressed: _addLocation,
+              icon: const Icon(Icons.search, size: 16),
+              label: const Text('搜索城市'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accentCyan.withValues(alpha: 0.15),
+                foregroundColor: AppColors.accentCyan,
+                side: const BorderSide(color: AppColors.accentCyan, width: 0.5),
+              ),
             ),
-            const SizedBox(height: 24),
-            TextButton.icon(
-              onPressed: _onRefresh,
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton.icon(
+              onPressed: _locateAndAdd,
               icon: const Icon(Icons.my_location, size: 16),
-              label: const Text('重新请求定位'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.accentCyan),
-            ),
-            TextButton.icon(
-              onPressed: () async {
-                if (locationState.permissionDenied) {
-                  await Geolocator.openAppSettings();
-                } else {
-                  await Geolocator.openLocationSettings();
-                }
-              },
-              icon: const Icon(Icons.settings, size: 16),
-              label: const Text('打开定位设置'),
+              label: const Text('使用当前位置'),
               style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  /// 定位并添加到地区列表
+  Future<void> _locateAndAdd() async {
+    final locationNotifier = ref.read(locationProvider.notifier);
+    await locationNotifier.requestLocation();
+    final locState = ref.read(locationProvider);
+    final loc = locState.location;
+    if (loc == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(locState.error ?? '获取定位失败',
+                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 11)),
+            backgroundColor: AppColors.warning.withValues(alpha: 0.9),
+          ),
+        );
+      }
+      return;
+    }
+    LocationData named = loc;
+    try {
+      named = await ref
+          .read(weatherRepositoryProvider)
+          .reverseGeocode(loc.latitude, loc.longitude);
+    } catch (_) {}
+    final index = ref.read(locationsProvider.notifier).add(named);
+    _jumpToPage(index);
+    await _loadWeatherForIndex(index);
   }
 
   Widget _buildErrorState(String error) {
@@ -362,14 +496,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildInitialState() {
+  Widget _buildInitialState(LocationData loc) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.cloud, size: 48, color: AppColors.accentCyanDim),
           const SizedBox(height: 16),
-          const Text('点击按钮获取天气数据', style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textSecondary)),
+          Text(
+            loc.name.isNotEmpty ? '${loc.name} 天气加载中' : '加载天气数据',
+            style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12, color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             width: 160,

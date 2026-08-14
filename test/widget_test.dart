@@ -19,6 +19,7 @@ void main() {
     Hive.init(dir.path);
     await Hive.openBox(AppConstants.hiveBoxWeather);
     await Hive.openBox(AppConstants.hiveBoxSettings);
+    await Hive.openBox(AppConstants.hiveBoxLocations);
   });
 
   testWidgets('App should build', (WidgetTester tester) async {
@@ -56,7 +57,9 @@ class _FakeWeatherRepository implements WeatherRepository {
   final WeatherData _weather = _sampleWeather();
 
   @override
-  Future<WeatherData> getWeather(double lat, double lng) async => _weather;
+  Future<WeatherData> getWeather(double lat, double lng,
+          {String cacheKey = 'default'}) async =>
+      _weather;
 
   @override
   Future<LocationData> reverseGeocode(double lat, double lng) async {
@@ -72,10 +75,10 @@ class _FakeWeatherRepository implements WeatherRepository {
       ];
 
   @override
-  WeatherData? getCachedWeather() => _weather;
+  WeatherData? getCachedWeather(String cacheKey) => _weather;
 
   @override
-  bool isCacheValid() => true;
+  bool isCacheValid(String cacheKey) => true;
 }
 
 WeatherData _sampleWeather() {
