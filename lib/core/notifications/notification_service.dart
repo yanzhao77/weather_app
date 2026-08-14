@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -16,13 +17,18 @@ class NotificationService {
 
   static Future<void> init() async {
     if (_initialized) return;
-    tz.initializeTimeZones();
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
-    await _plugin.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
-    );
-    _initialized = true;
+    try {
+      tz.initializeTimeZones();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings();
+      await _plugin.initialize(
+        const InitializationSettings(android: androidInit, iOS: iosInit),
+      );
+      _initialized = true;
+    } catch (e) {
+      // 通知插件初始化失败不应阻塞应用启动
+      debugPrint('[NEXUS][notify] init failed: $e');
+    }
   }
 
   static Future<void> requestPermissions() async {

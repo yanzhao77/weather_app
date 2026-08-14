@@ -17,7 +17,14 @@ class ApiClient {
   }
 
   static String _resolveApiKey() {
-    final fromEnv = dotenv.env['OPENWEATHER_API_KEY'];
+    // dotenv 可能未加载（release 包不含 .env 资源），未初始化时访问
+    // dotenv.env 会抛 NotInitializedError，这里安全降级
+    String? fromEnv;
+    try {
+      fromEnv = dotenv.env['OPENWEATHER_API_KEY'];
+    } catch (_) {
+      fromEnv = null;
+    }
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
     if (_dartDefineApiKey.isNotEmpty) return _dartDefineApiKey;
     return AppConstants.defaultApiKey;

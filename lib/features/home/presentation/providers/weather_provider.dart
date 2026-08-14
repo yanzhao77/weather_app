@@ -17,7 +17,7 @@ final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 
 final weatherApiServiceProvider =
     Provider<WeatherApiService>((ref) {
-  return WeatherApiService(ref.read(apiClientProvider));
+  return WeatherApiService(ref.watch(apiClientProvider));
 });
 
 final localDataSourceProvider =
@@ -26,8 +26,8 @@ final localDataSourceProvider =
 final weatherRepositoryProvider =
     Provider<WeatherRepository>((ref) {
   return WeatherRepositoryImpl(
-    ref.read(weatherApiServiceProvider),
-    ref.read(localDataSourceProvider),
+    ref.watch(weatherApiServiceProvider),
+    ref.watch(localDataSourceProvider),
   );
 });
 
@@ -110,6 +110,6 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
 final weatherProvider =
     StateNotifierProvider.family<WeatherNotifier, WeatherState, String>(
         (ref, locationKey) {
-  final repo = ref.read(weatherRepositoryProvider);
+  final repo = ref.watch(weatherRepositoryProvider);
   return WeatherNotifier(repo, locationKey);
 });
