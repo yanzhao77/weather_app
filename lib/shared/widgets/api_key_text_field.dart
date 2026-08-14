@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// 拦截粘贴动作的 Intent（Ctrl/Cmd+V 时吞掉，不执行粘贴）
-class _IgnorePasteIntent extends Intent {
-  const _IgnorePasteIntent();
+/// 拦截复制动作的 Intent（Ctrl/Cmd+C 时吞掉，防止 key 被复制出去）
+class _IgnoreCopyIntent extends Intent {
+  const _IgnoreCopyIntent();
 }
 
-class _IgnorePasteAction extends Action<_IgnorePasteIntent> {
+class _IgnoreCopyAction extends Action<_IgnoreCopyIntent> {
   @override
-  Object? invoke(_IgnorePasteIntent intent) => null;
+  Object? invoke(_IgnoreCopyIntent intent) => null;
 }
 
 /// API Key 输入框：
 /// - 掩码显示（obscureText）
-/// - 不可选中/复制（enableInteractiveSelection=false + 无长按菜单）
-/// - 不可粘贴（长按菜单、Ctrl/Cmd+V、IME 大段粘贴回滚三重拦截）
+/// - 禁止复制：Ctrl/Cmd+C 拦截、长按菜单不提供复制项
+/// - 允许粘贴：长按菜单提供「粘贴」、Ctrl/Cmd+V 放行、输入法粘贴放行
 /// - 仅允许 key 字符集（字母数字），限制长度
 class ApiKeyTextField extends StatefulWidget {
   final TextEditingController controller;
@@ -35,38 +35,16 @@ class ApiKeyTextField extends StatefulWidget {
 }
 
 class _ApiKeyTextFieldState extends State<ApiKeyTextField> {
-  String _lastText = '';
-  bool _pasteRejected = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _lastText = widget.controller.text;
-  }
-
-  void _onChanged(String text) {
-    // 疑似粘贴（单次插入超过 4 个字符）：回滚并拒绝
-    if (text.length > _lastText.length + 4) {
-      widget.controller.text = _lastText;
-      widget.controller.selection =
-          TextSelection.collapsed(offset: _lastText.length);
-      setState(() => _pasteRejected = true);
-      return;
-    }
-    _lastText = text;
-    setState(() => _pasteRejected = false);
-    widget.onChanged?.call(text);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Shortcuts(
       shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.keyV, control: true): _IgnorePasteIntent(),
-        SingleActivator(LogicalKeyboardKey.keyV, meta: true): _IgnorePasteIntent(),
+        // 拦截复制（禁止 key 流出）；粘贴（Ctrl/Cmd+V）放行
+        SingleActivator(LogicalKeyboardKey.keyC, control: true): _IgnoreCopyIntent(),
+        SingleActivator(LogicalKeyboardKey.keyC, meta: true): _IgnoreCopyIntent(),
       },
       child: Actions(
-        actions: {_IgnorePasteIntent: _IgnorePasteAction()},
+        actions: {_IgnoreCopyIntent: _IgnoreCopyAction()},
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,15 +54,25 @@ class _ApiKeyTextFieldState extends State<ApiKeyTextField> {
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              enableInteractiveSelection: false,
-              contextMenuBuilder: (context, editableTextState) =>
-                  const SizedBox.shrink(),
+              onChanged: widget.onChanged,
+              // 长按菜单：只提供「粘贴」，不提供复制/全选/剪切
+              contextMenuBuilder: (context, editableTextState) {
+                return AdaptiveTextSelectionToolbar.buttonItems(
+                  anchors: editableTextState.contextMenuAnchors,
+                  buttonItems: [
+                    ContextMenuButtonItem(
+                      label: '粘贴',
+                      onPressed: () => editableTextState
+                          .pasteText(SelectionChangedCause.toolbar),
+                    ),
+                  ],
+                );
+              },
               inputFormatters: [
                 // key 仅允许字母数字（OpenWeatherMap key 为 32 位 hex）
                 FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
                 LengthLimitingTextInputFormatter(64),
               ],
-              onChanged: _onChanged,
               style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: 13,
@@ -108,10 +96,10 @@ class _ApiKeyTextFieldState extends State<ApiKeyTextField> {
                 ),
               ),
             ),
-            if (_pasteRejected || widget.errorText != null) ...[
+            if (widget.errorText != null) ...[
               const SizedBox(height: 6),
               Text(
-                _pasteRejected ? '不允许粘贴，请手动输入' : (widget.errorText ?? ''),
+                widget.errorText!,
                 style: const TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: 9,

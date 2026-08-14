@@ -145,7 +145,7 @@ class SettingsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '密钥仅用于请求天气数据，掩码显示，不可复制、不可粘贴。',
+              '密钥仅用于请求天气数据，掩码显示，不可复制；支持粘贴输入。',
               style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, height: 1.5, color: AppColors.textDim),
             ),
             const SizedBox(height: 12),
@@ -218,7 +218,7 @@ class _ApiKeyTile extends StatelessWidget {
           style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: 13, color: AppColors.textPrimary),
         ),
         subtitle: Text(
-          configured ? '已配置（掩码显示，不可查看/复制）' : '未配置，点击设置',
+          configured ? '已配置（掩码显示，不可复制，可粘贴输入）' : '未配置，点击设置',
           style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 10, color: AppColors.textDim),
         ),
         trailing: Icon(
